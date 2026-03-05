@@ -1,0 +1,10 @@
+[project]
+name = "beans-vm-bootstrap"
+version = "0.1.0"
+description = "Bootstrap installer for Linux Mint 22.3 OSR VM builds."
+readme = "README.md"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]

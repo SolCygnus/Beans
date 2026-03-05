@@ -1,0 +1,1 @@
+"""Beans installer package."""
