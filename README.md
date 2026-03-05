@@ -37,7 +37,7 @@ This is recommended, not required. Beans runs `apt-get update` and installs requ
 Clone and run:
 
 ```bash
-git clone <YOUR_BEANS_REPO_URL>
+git clone https://github.com/SolCygnus/Beans.git
 cd beans
 sudo python3 main.py --profile default
 ```
