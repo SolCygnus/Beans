@@ -1,5 +1,7 @@
+# Python bytecode/cache
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 *.pyo
 
 # Python virtual environments
@@ -13,7 +15,18 @@ env/
 .mypy_cache/
 .ruff_cache/
 .coverage
+coverage.xml
 htmlcov/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Local databases / app data
+*.sqlite
+*.sqlite3
+*.db
 
 # Logs
 *.log
@@ -22,3 +35,14 @@ htmlcov/
 .DS_Store
 Thumbs.db
 .idea/
+
+# VS Code local workspace settings
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Build/package artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
