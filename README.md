@@ -80,7 +80,7 @@ sudo python3 main.py --refresh-assets all
 - Firefox and Chrome open with visible bookmark toolbars and imported bookmarks
 - Firefox shows uBlock Origin installed in `about:addons`
 - Firefox blocks new location, camera, and microphone permission requests
-- Wallpaper and Beans panel launchers are applied before Mint's grouped taskbar without duplicating Firefox
+- Wallpaper and Cinnamon pinned launchers are applied
 - User is in `vboxsf` group (`id <user>`; change takes effect after logout/reboot)
 
 ## What Beans Installs
@@ -124,7 +124,7 @@ sudo python3 main.py --refresh-assets all
 - Beans wallpaper
 - Terminal banner in `.bashrc`
 - Mint dark mode via `Mint-Y-Dark`
-- Beans taskbar launchers begin with Firefox, followed by Brave, Chrome, Tor Browser, calculator, Obsidian, KeePassXC, VS Code, VLC, and Mint Notes
+- Cinnamon taskbar favorites in fixed order: Firefox, Brave, Chrome, Tor Browser, calculator, Obsidian, KeePassXC, VS Code, VLC, and notes
 
 ## Operational Notes
 

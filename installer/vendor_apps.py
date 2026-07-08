@@ -7,18 +7,12 @@ import urllib.request
 
 from installer.context import InstallerContext
 from installer.summary import record_note
-from installer.system import (
-    download_to_file,
-    package_installed,
-    run_command,
-    write_text,
-)
+from installer.system import download_to_file, package_installed, run_command, write_text
 
 
 BEANS_HELP_LAUNCHER = """#!/bin/sh
 exec cat /usr/local/share/beans/help.txt
 """
-STICKY_WRAPPER_PATH = Path("/usr/local/bin/beans-sticky-note")
 
 
 def _fetch_json(url: str) -> dict:
@@ -28,28 +22,6 @@ def _fetch_json(url: str) -> dict:
 
 def _refresh_desktop_database(ctx: InstallerContext) -> None:
     run_command(ctx, ["update-desktop-database", "/usr/share/applications"], check=False)
-
-
-def _remove_sticky_note_feature(ctx: InstallerContext) -> None:
-    sticky_autostart = ctx.user_home / ".config" / "autostart" / "sticky.desktop"
-    if sticky_autostart.exists():
-        content = sticky_autostart.read_text(encoding="utf-8", errors="ignore")
-        if "beans-sticky-note" in content:
-            sticky_autostart.unlink()
-    for path in (
-        STICKY_WRAPPER_PATH,
-        ctx.user_local_share_dir / "sticky-note.txt",
-        ctx.user_state_dir / "sticky-note-created",
-        ctx.user_state_dir / "sticky-note-created-v2",
-    ):
-        path.unlink(missing_ok=True)
-    for key in ("autostart", "autostart-notes-visible"):
-        run_command(
-            ctx,
-            ["dbus-run-session", "--", "gsettings", "set", "org.x.sticky", key, "false"],
-            user=ctx.real_user,
-            check=False,
-        )
 
 
 def _install_vscode_repo(ctx: InstallerContext) -> None:
@@ -158,10 +130,9 @@ def install_desktop_assets(ctx: InstallerContext) -> None:
     if ctx.dry_run:
         record_note(ctx, "Dry run: would install Beans desktop assets, help command, and hash-check wrapper.")
         return
-    _remove_sticky_note_feature(ctx)
     readme_src = ctx.assets_dir / "desktop" / "README.txt"
     readme_dst = ctx.desktop_dir / "Beans-README.txt"
-    if readme_src.exists():
+    if readme_src.exists() and not ctx.dry_run:
         readme_content = readme_src.read_text(encoding="utf-8")
         readme_dst.parent.mkdir(parents=True, exist_ok=True)
         readme_dst.write_text(readme_content, encoding="utf-8")
@@ -177,4 +148,4 @@ def install_desktop_assets(ctx: InstallerContext) -> None:
     )
     timestamp = int(time.time())
     _refresh_desktop_database(ctx)
-    record_note(ctx, f"Desktop assets were refreshed at {timestamp}.")
+    record_note(ctx, f"Desktop assets refreshed at {timestamp}.")
