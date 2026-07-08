@@ -1,0 +1,5 @@
+Beans is ready.
+
+Firefox includes uBlock Origin and blocks new location, camera, and microphone requests.
+
+See Beans-README.txt on the desktop for commands and operational notes.

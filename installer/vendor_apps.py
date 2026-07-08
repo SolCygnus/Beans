@@ -7,7 +7,51 @@ import urllib.request
 
 from installer.context import InstallerContext
 from installer.summary import record_note
-from installer.system import download_to_file, package_installed, run_command, write_text
+from installer.system import (
+    chown_path,
+    download_to_file,
+    ensure_directory_for_user,
+    package_installed,
+    run_command,
+    write_text,
+)
+
+
+STICKY_NOTE_LAUNCHER = """#!/bin/sh
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/beans"
+note_file="${XDG_DATA_HOME:-$HOME/.local/share}/beans/sticky-note.txt"
+marker="$state_dir/sticky-note-created"
+
+sticky >/dev/null 2>&1 &
+[ -e "$marker" ] && exit 0
+mkdir -p "$state_dir"
+
+attempt=0
+while [ "$attempt" -lt 20 ]; do
+    if dbus-send --session --type=method_call --dest=org.x.sticky /org/x/sticky org.x.sticky.NewNote string:"$(cat "$note_file")"; then
+        touch "$marker"
+        exit 0
+    fi
+    attempt=$((attempt + 1))
+    sleep 1
+done
+exit 1
+"""
+
+STICKY_AUTOSTART = """[Desktop Entry]
+Type=Application
+Name=Notes
+Comment=Start Notes and create the Beans welcome note
+Exec=/usr/local/bin/beans-sticky-note
+Terminal=false
+NoDisplay=true
+OnlyShowIn=X-Cinnamon;
+X-GNOME-Autostart-enabled=true
+"""
+
+BEANS_HELP_LAUNCHER = """#!/bin/sh
+exec cat /usr/local/share/beans/help.txt
+"""
 
 
 def _fetch_json(url: str) -> dict:
@@ -123,14 +167,29 @@ def install_obsidian(ctx: InstallerContext) -> None:
 
 def install_desktop_assets(ctx: InstallerContext) -> None:
     if ctx.dry_run:
-        record_note(ctx, "Dry run: would install Beans desktop assets and hash-check wrapper.")
+        record_note(ctx, "Dry run: would install Beans desktop assets, help command, Notes autostart, and hash-check wrapper.")
         return
     readme_src = ctx.assets_dir / "desktop" / "README.txt"
     readme_dst = ctx.desktop_dir / "Beans-README.txt"
-    if readme_src.exists() and not ctx.dry_run:
+    if readme_src.exists():
+        readme_content = readme_src.read_text(encoding="utf-8")
         readme_dst.parent.mkdir(parents=True, exist_ok=True)
-        readme_dst.write_text(readme_src.read_text(encoding="utf-8"), encoding="utf-8")
+        readme_dst.write_text(readme_content, encoding="utf-8")
         run_command(ctx, ["chown", f"{ctx.real_user}:{ctx.real_user}", str(readme_dst)])
+        write_text(Path("/usr/local/share/beans/help.txt"), readme_content)
+        write_text(Path("/usr/local/bin/beans-help"), BEANS_HELP_LAUNCHER, mode=0o755)
+
+    sticky_note_src = ctx.assets_dir / "desktop" / "STICKY_NOTE.txt"
+    sticky_note_dst = ctx.user_local_share_dir / "sticky-note.txt"
+    if sticky_note_src.exists():
+        ensure_directory_for_user(ctx, ctx.user_local_share_dir)
+        write_text(sticky_note_dst, sticky_note_src.read_text(encoding="utf-8"))
+        chown_path(ctx, sticky_note_dst)
+    write_text(Path("/usr/local/bin/beans-sticky-note"), STICKY_NOTE_LAUNCHER, mode=0o755)
+    sticky_autostart = ctx.user_home / ".config" / "autostart" / "sticky.desktop"
+    ensure_directory_for_user(ctx, sticky_autostart.parent)
+    write_text(sticky_autostart, STICKY_AUTOSTART)
+    chown_path(ctx, sticky_autostart)
 
     hash_check_target = ctx.repo_root / "installer" / "hash_check.py"
     write_text(
@@ -140,4 +199,4 @@ def install_desktop_assets(ctx: InstallerContext) -> None:
     )
     timestamp = int(time.time())
     _refresh_desktop_database(ctx)
-    record_note(ctx, f"Desktop assets refreshed at {timestamp}.")
+    record_note(ctx, f"Desktop assets and the autostarted Beans welcome note were refreshed at {timestamp}.")

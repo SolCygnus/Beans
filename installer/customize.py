@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 
 from installer.context import InstallerContext
 from installer.summary import record_note
-from installer.system import chown_path, copy_path, ensure_directory_for_user, read_json, run_command, write_text
+from installer.system import copy_path, run_command
 
 try:
     import pwd
@@ -24,10 +23,9 @@ PANEL_SLOTS = [
     ("KeePassXC", ["org.keepassxc.KeePassXC.desktop", "keepassxc.desktop"]),
     ("VS Code", ["code.desktop"]),
     ("VLC", ["vlc.desktop"]),
-    ("Notes", ["xed.desktop", "org.x.editor.desktop"]),
+    ("Notes", ["sticky.desktop", "xed.desktop", "org.x.editor.desktop"]),
 ]
-PANEL_APPLET_ID = 100
-PANEL_APPLET_ENTRY = f"panel1:left:2:panel-launchers@cinnamon.org:{PANEL_APPLET_ID}"
+LEGACY_PANEL_APPLET_ENTRY = "panel1:left:2:panel-launchers@cinnamon.org:100"
 
 
 def _user_env(ctx: InstallerContext) -> dict[str, str]:
@@ -98,28 +96,31 @@ def _favorite_apps() -> tuple[list[str], list[str]]:
     return launchers, missing
 
 
-def _configure_panel_launchers(ctx: InstallerContext) -> None:
+def _without_legacy_panel_applet(enabled_applets: str) -> str | None:
+    if LEGACY_PANEL_APPLET_ENTRY not in enabled_applets:
+        return None
+    return enabled_applets.replace(f"'{LEGACY_PANEL_APPLET_ENTRY}', ", "").replace(
+        f", '{LEGACY_PANEL_APPLET_ENTRY}'", ""
+    ).replace(f"'{LEGACY_PANEL_APPLET_ENTRY}'", "")
+
+
+def _configure_panel_favorites(ctx: InstallerContext) -> None:
     launchers, missing = _favorite_apps()
     if not launchers:
-        record_note(ctx, "No requested Cinnamon launcher desktop files were found for panel pinning.")
+        record_note(ctx, "No requested Cinnamon desktop files were found for taskbar favorites.")
         return
     if ctx.dry_run:
-        record_note(ctx, "Dry run: would pin the tightened Cinnamon launcher set to the panel.")
+        record_note(ctx, "Dry run: would configure the Cinnamon grouped-taskbar favorites.")
         return
 
-    config_dir = ctx.user_home / ".cinnamon" / "configs" / "panel-launchers@cinnamon.org"
-    ensure_directory_for_user(ctx, config_dir)
-    config_path = config_dir / f"{PANEL_APPLET_ID}.json"
-    config_payload = read_json(config_path, default={})
-    config_payload["launcherList"] = {
-        "type": "list",
-        "default": [],
-        "value": launchers,
-    }
-    write_text(config_path, json.dumps(config_payload, indent=2, sort_keys=True) + "\n")
-    chown_path(ctx, config_path)
-
     env = _user_env(ctx)
+    run_command(
+        ctx,
+        ["gsettings", "set", "org.cinnamon", "favorite-apps", repr(launchers)],
+        user=ctx.real_user,
+        env=env,
+        check=False,
+    )
     enabled = run_command(
         ctx,
         ["gsettings", "get", "org.cinnamon", "enabled-applets"],
@@ -130,20 +131,18 @@ def _configure_panel_launchers(ctx: InstallerContext) -> None:
     )
     if enabled.returncode == 0:
         current = enabled.stdout.strip()
-        if PANEL_APPLET_ENTRY not in current:
-            if current.startswith("[") and current.endswith("]"):
-                inner = current[1:-1].strip()
-                updated = f"[{inner}, '{PANEL_APPLET_ENTRY}']" if inner else f"['{PANEL_APPLET_ENTRY}']"
-                run_command(
-                    ctx,
-                    ["gsettings", "set", "org.cinnamon", "enabled-applets", updated],
-                    user=ctx.real_user,
-                    env=env,
-                    check=False,
-                )
+        updated = _without_legacy_panel_applet(current)
+        if updated is not None:
+            run_command(
+                ctx,
+                ["gsettings", "set", "org.cinnamon", "enabled-applets", updated],
+                user=ctx.real_user,
+                env=env,
+                check=False,
+            )
     if missing:
-        record_note(ctx, f"Some requested panel launchers were not found and were skipped: {', '.join(missing)}.")
-    record_note(ctx, "Pinned Cinnamon panel launchers were configured. A logout or Cinnamon restart may be required.")
+        record_note(ctx, f"Some requested taskbar favorites were not found and were skipped: {', '.join(missing)}.")
+    record_note(ctx, "Cinnamon grouped-taskbar favorites were configured. A logout or Cinnamon restart may be required.")
 
 
 def _apply_dark_mode(ctx: InstallerContext) -> None:
@@ -164,5 +163,5 @@ def apply_desktop_customizations(ctx: InstallerContext) -> None:
     _append_banner(ctx)
     _apply_wallpaper(ctx)
     _apply_dark_mode(ctx)
-    _configure_panel_launchers(ctx)
-    record_note(ctx, "Desktop customizations applied: banner, wallpaper, dark mode, and Cinnamon panel launchers.")
+    _configure_panel_favorites(ctx)
+    record_note(ctx, "Desktop customizations applied: banner, wallpaper, dark mode, and Cinnamon taskbar favorites.")

@@ -6,3 +6,4 @@
 *.service text eol=lf
 *.timer text eol=lf
 *.desktop text eol=lf
+*.md text eol=lf

@@ -57,6 +57,7 @@ sudo python3 main.py --profile default
 ### Other Commands
 
 ```bash
+beans-help
 sudo python3 main.py --dry-run
 sudo python3 main.py --only searxng
 sudo python3 main.py --refresh-assets firefox
@@ -77,14 +78,17 @@ sudo python3 main.py --refresh-assets all
 - `beans-searxng-start` opens the local interface at `http://127.0.0.1:8888`
 - `beans-searxng-status` reports that the local interface is responding
 - Firefox and Chrome open with visible bookmark toolbars and imported bookmarks
-- Wallpaper and Cinnamon pinned launchers are applied
+- Firefox shows uBlock Origin installed in `about:addons`
+- Firefox blocks new location, camera, and microphone permission requests
+- Wallpaper and Cinnamon grouped-taskbar favorites are applied without a duplicate Firefox launcher
+- Mint Notes starts automatically with a Beans welcome note on the desktop
 - User is in `vboxsf` group (`id <user>`; change takes effect after logout/reboot)
 
 ## What Beans Installs
 
 ### Default Browsers
 
-- Firefox: configured as the research browser with Beans-managed `user.js`, a default profile, visible bookmarks toolbar, and imported toolbar bookmark assets
+- Firefox: configured as the research browser with Beans-managed `user.js`, a default profile, visible bookmarks toolbar, imported toolbar bookmark assets, and force-installed uBlock Origin
 - Brave: installed and otherwise unmodified
 - Google Chrome: installed with a visible bookmark bar and the same Beans-managed `PAI` bookmark tree used by Firefox
 - Tor Browser: installed via `torbrowser-launcher`; first-run setup is user-completed
@@ -121,7 +125,8 @@ sudo python3 main.py --refresh-assets all
 - Beans wallpaper
 - Terminal banner in `.bashrc`
 - Mint dark mode via `Mint-Y-Dark`
-- Cinnamon taskbar favorites in fixed order: Firefox, Brave, Chrome, Tor Browser, calculator, Obsidian, KeePassXC, VS Code, VLC, and notes
+- Cinnamon grouped-taskbar favorites in fixed order: Firefox, Brave, Chrome, Tor Browser, calculator, Obsidian, KeePassXC, VS Code, VLC, and Mint Notes
+- Mint Notes autostart with a one-time Beans welcome note
 
 ## Operational Notes
 
@@ -171,8 +176,8 @@ The launcher binds SearXNG to localhost only; it is not exposed to the VM networ
 
 - Shared Firefox and Chrome source folder: `assets/firefox/bookmarks/`
 - `bookmarks.html` is imported as direct top-level toolbar links
-- `LINKS_2024.html` supplies the folders directly under the managed `PAI` toolbar folder; unrelated top-level export links are ignored
-- `OSINT_Combine_bookmarks_11_12_25.html` is imported under `PAI > OSINT Combine`, preserving its category folders
+- `PAI_bookmarks_2026.html` supplies the complete managed `PAI` toolbar folder for Firefox and Chrome
+- Export wrapper folders are removed while all headers beneath `PAI` retain their original folder hierarchy
 
 After bookmark updates:
 
