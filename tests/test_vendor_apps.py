@@ -7,8 +7,12 @@ def test_sticky_autostart_uses_beans_launcher() -> None:
 
 
 def test_sticky_launcher_creates_welcome_note_once() -> None:
+    assert "sticky --autostart" in STICKY_NOTE_LAUNCHER
+    assert "gsettings set org.x.sticky autostart true" in STICKY_NOTE_LAUNCHER
+    assert "gsettings set org.x.sticky autostart-notes-visible true" in STICKY_NOTE_LAUNCHER
+    assert "gdbus wait --session --timeout 1 org.x.sticky" in STICKY_NOTE_LAUNCHER
     assert "org.x.sticky.NewNote" in STICKY_NOTE_LAUNCHER
-    assert 'marker="$state_dir/sticky-note-created"' in STICKY_NOTE_LAUNCHER
+    assert 'marker="$state_dir/sticky-note-created-v2"' in STICKY_NOTE_LAUNCHER
     assert 'touch "$marker"' in STICKY_NOTE_LAUNCHER
 
 

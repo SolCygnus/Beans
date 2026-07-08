@@ -20,15 +20,19 @@ from installer.system import (
 STICKY_NOTE_LAUNCHER = """#!/bin/sh
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/beans"
 note_file="${XDG_DATA_HOME:-$HOME/.local/share}/beans/sticky-note.txt"
-marker="$state_dir/sticky-note-created"
+marker="$state_dir/sticky-note-created-v2"
 
-sticky >/dev/null 2>&1 &
+gsettings set org.x.sticky autostart true
+gsettings set org.x.sticky autostart-notes-visible true
+sticky --autostart >/dev/null 2>&1 &
 [ -e "$marker" ] && exit 0
+[ -s "$note_file" ] || exit 1
 mkdir -p "$state_dir"
 
 attempt=0
 while [ "$attempt" -lt 20 ]; do
-    if dbus-send --session --type=method_call --dest=org.x.sticky /org/x/sticky org.x.sticky.NewNote string:"$(cat "$note_file")"; then
+    if gdbus wait --session --timeout 1 org.x.sticky; then
+        dbus-send --session --type=method_call --dest=org.x.sticky /org/x/sticky org.x.sticky.NewNote string:"$(cat "$note_file")"
         touch "$marker"
         exit 0
     fi
@@ -44,9 +48,10 @@ Name=Notes
 Comment=Start Notes and create the Beans welcome note
 Exec=/usr/local/bin/beans-sticky-note
 Terminal=false
+Hidden=false
 NoDisplay=true
-OnlyShowIn=X-Cinnamon;
 X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=2
 """
 
 BEANS_HELP_LAUNCHER = """#!/bin/sh

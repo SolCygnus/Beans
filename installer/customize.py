@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import ast
 import os
 from pathlib import Path
 
 from installer.context import InstallerContext
 from installer.summary import record_note
-from installer.system import copy_path, run_command
+from installer.system import (
+    chown_path,
+    copy_path,
+    ensure_directory_for_user,
+    read_json,
+    run_command,
+    write_json,
+)
 
 try:
     import pwd
@@ -26,6 +34,7 @@ PANEL_SLOTS = [
     ("Notes", ["sticky.desktop", "xed.desktop", "org.x.editor.desktop"]),
 ]
 LEGACY_PANEL_APPLET_ENTRY = "panel1:left:2:panel-launchers@cinnamon.org:100"
+GROUPED_WINDOW_LIST_UUID = "grouped-window-list@cinnamon.org"
 
 
 def _user_env(ctx: InstallerContext) -> dict[str, str]:
@@ -104,6 +113,40 @@ def _without_legacy_panel_applet(enabled_applets: str) -> str | None:
     ).replace(f"'{LEGACY_PANEL_APPLET_ENTRY}'", "")
 
 
+def _grouped_window_list_instance_ids(enabled_applets: str) -> list[str]:
+    try:
+        entries = ast.literal_eval(enabled_applets)
+    except (SyntaxError, ValueError):
+        return []
+    if not isinstance(entries, list):
+        return []
+    instance_ids: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, str) or f":{GROUPED_WINDOW_LIST_UUID}:" not in entry:
+            continue
+        instance_id = entry.rsplit(":", 1)[-1]
+        if instance_id and instance_id not in instance_ids:
+            instance_ids.append(instance_id)
+    return instance_ids
+
+
+def _write_grouped_window_list_favorites(
+    ctx: InstallerContext, instance_ids: list[str], launchers: list[str]
+) -> None:
+    config_dir = ctx.user_home / ".cinnamon" / "configs" / GROUPED_WINDOW_LIST_UUID
+    ensure_directory_for_user(ctx, config_dir)
+    for instance_id in instance_ids:
+        config_path = config_dir / f"{instance_id}.json"
+        config_payload = read_json(config_path, default={})
+        config_payload["pinned-apps"] = {
+            "type": "generic",
+            "default": ["nemo.desktop", "firefox.desktop", "org.gnome.Terminal.desktop"],
+            "value": launchers,
+        }
+        write_json(config_path, config_payload)
+        chown_path(ctx, config_path)
+
+
 def _configure_panel_favorites(ctx: InstallerContext) -> None:
     launchers, missing = _favorite_apps()
     if not launchers:
@@ -114,13 +157,6 @@ def _configure_panel_favorites(ctx: InstallerContext) -> None:
         return
 
     env = _user_env(ctx)
-    run_command(
-        ctx,
-        ["gsettings", "set", "org.cinnamon", "favorite-apps", repr(launchers)],
-        user=ctx.real_user,
-        env=env,
-        check=False,
-    )
     enabled = run_command(
         ctx,
         ["gsettings", "get", "org.cinnamon", "enabled-applets"],
@@ -131,6 +167,11 @@ def _configure_panel_favorites(ctx: InstallerContext) -> None:
     )
     if enabled.returncode == 0:
         current = enabled.stdout.strip()
+        instance_ids = _grouped_window_list_instance_ids(current)
+        if instance_ids:
+            _write_grouped_window_list_favorites(ctx, instance_ids, launchers)
+        else:
+            record_note(ctx, "The Cinnamon grouped-window-list applet was not found; taskbar favorites were unchanged.")
         updated = _without_legacy_panel_applet(current)
         if updated is not None:
             run_command(

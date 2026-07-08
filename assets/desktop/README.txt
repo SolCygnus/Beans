@@ -4,6 +4,7 @@ Important Admin Notes:
 
 - Beans was built for Linux Mint 22.3 Cinnamon on VirtualBox.
 - Use a master VM or snapshot as a baseline and perform research in disposable clones.
+- If this desktop file is deleted, display it anytime from a terminal with `beans-help`.
 
 Web Research:
 
@@ -14,7 +15,6 @@ Web Research:
 
 Beans Commands:
 
-- Show this command reference at any time: `beans-help`
 - Start local SearXNG: `beans-searxng-start`
 - Check or stop SearXNG: `beans-searxng-status` or `beans-searxng-stop`
 - Transcribe media with WhisperAI: `beans-whisper INPUT_FILE`

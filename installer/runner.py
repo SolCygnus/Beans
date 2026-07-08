@@ -113,8 +113,9 @@ def refresh_assets(ctx: InstallerContext) -> int:
         obsidian.seed_obsidian_assets(ctx)
         record_result(ctx, "refresh-obsidian", "ok", "Reapplied Obsidian assets")
     if "desktop" in targets:
+        vendor_apps.install_desktop_assets(ctx)
         customize.apply_desktop_customizations(ctx)
-        record_result(ctx, "refresh-desktop", "ok", "Reapplied desktop customizations")
+        record_result(ctx, "refresh-desktop", "ok", "Reapplied desktop assets and customizations")
     write_summary(ctx)
     return 0
 
