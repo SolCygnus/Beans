@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ except ImportError:  # pragma: no cover - only relevant off Linux
 
 
 PANEL_SLOTS = [
+    ("Firefox", ["firefox.desktop"]),
     ("Brave", ["brave-browser.desktop"]),
     ("Chrome", ["google-chrome.desktop"]),
     ("Tor Browser", ["torbrowser.desktop"]),
@@ -34,6 +36,7 @@ PANEL_SLOTS = [
 ]
 PANEL_APPLET_ID = 100
 PANEL_APPLET_ENTRY = f"panel1:left:2:panel-launchers@cinnamon.org:{PANEL_APPLET_ID}"
+GROUPED_WINDOW_LIST_UUID = "grouped-window-list@cinnamon.org"
 
 
 def _user_env(ctx: InstallerContext) -> dict[str, str]:
@@ -104,13 +107,71 @@ def _favorite_apps() -> tuple[list[str], list[str]]:
     return launchers, missing
 
 
-def _enabled_with_panel_applet(enabled_applets: str) -> str | None:
-    if PANEL_APPLET_ENTRY in enabled_applets:
+def _parse_enabled_applets(enabled_applets: str) -> list[str] | None:
+    try:
+        entries = ast.literal_eval(enabled_applets)
+    except (SyntaxError, ValueError):
         return None
-    if not enabled_applets.startswith("[") or not enabled_applets.endswith("]"):
+    if not isinstance(entries, list) or not all(isinstance(entry, str) for entry in entries):
         return None
-    inner = enabled_applets[1:-1].strip()
-    return f"[{inner}, '{PANEL_APPLET_ENTRY}']" if inner else f"['{PANEL_APPLET_ENTRY}']"
+    return entries
+
+
+def _arranged_panel_applets(enabled_applets: str) -> str | None:
+    entries = _parse_enabled_applets(enabled_applets)
+    if entries is None:
+        return None
+    original = entries.copy()
+    entries = [
+        entry
+        for entry in entries
+        if f":panel-launchers@cinnamon.org:{PANEL_APPLET_ID}" not in entry
+    ]
+    for index, entry in enumerate(entries):
+        if entry.startswith("panel1:left:2:") and f":{GROUPED_WINDOW_LIST_UUID}:" in entry:
+            entries[index] = entry.replace("panel1:left:2:", "panel1:left:3:", 1)
+    grouped_index = next(
+        (index for index, entry in enumerate(entries) if f":{GROUPED_WINDOW_LIST_UUID}:" in entry),
+        len(entries),
+    )
+    entries.insert(grouped_index, PANEL_APPLET_ENTRY)
+    return repr(entries) if entries != original else None
+
+
+def _grouped_window_list_instance_ids(enabled_applets: str) -> list[str]:
+    entries = _parse_enabled_applets(enabled_applets) or []
+    return [
+        entry.rsplit(":", 1)[-1]
+        for entry in entries
+        if f":{GROUPED_WINDOW_LIST_UUID}:" in entry
+    ]
+
+
+def _remove_grouped_firefox_pin(ctx: InstallerContext, instance_ids: list[str]) -> None:
+    config_dir = ctx.user_home / ".cinnamon" / "configs" / GROUPED_WINDOW_LIST_UUID
+    ensure_directory_for_user(ctx, config_dir)
+    for instance_id in instance_ids:
+        config_path = config_dir / f"{instance_id}.json"
+        config_payload = read_json(config_path, default={})
+        pinned_apps = config_payload.get("pinned-apps")
+        if not isinstance(pinned_apps, dict):
+            pinned_apps = {}
+        current = pinned_apps.get(
+            "value",
+            ["nemo.desktop", "firefox.desktop", "org.gnome.Terminal.desktop"],
+        )
+        if not isinstance(current, list):
+            current = []
+        pinned_apps.update(
+            {
+                "type": "generic",
+                "default": ["nemo.desktop", "firefox.desktop", "org.gnome.Terminal.desktop"],
+                "value": [app for app in current if app != "firefox.desktop"],
+            }
+        )
+        config_payload["pinned-apps"] = pinned_apps
+        write_text(config_path, json.dumps(config_payload, indent=2, sort_keys=True) + "\n")
+        chown_path(ctx, config_path)
 
 
 def _configure_panel_launchers(ctx: InstallerContext) -> None:
@@ -145,7 +206,8 @@ def _configure_panel_launchers(ctx: InstallerContext) -> None:
     )
     if enabled.returncode == 0:
         current = enabled.stdout.strip()
-        updated = _enabled_with_panel_applet(current)
+        _remove_grouped_firefox_pin(ctx, _grouped_window_list_instance_ids(current))
+        updated = _arranged_panel_applets(current)
         if updated is not None:
             run_command(
                 ctx,
@@ -156,7 +218,7 @@ def _configure_panel_launchers(ctx: InstallerContext) -> None:
             )
     if missing:
         record_note(ctx, f"Some requested panel launchers were not found and were skipped: {', '.join(missing)}.")
-    record_note(ctx, "Beans panel launchers were configured without duplicating Mint's Firefox pin. A logout or Cinnamon restart may be required.")
+    record_note(ctx, "Beans panel launchers were configured with Firefox first and removed from Mint's grouped pins. A logout or Cinnamon restart may be required.")
 
 
 def _apply_dark_mode(ctx: InstallerContext) -> None:
