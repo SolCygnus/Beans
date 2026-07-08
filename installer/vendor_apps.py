@@ -10,6 +10,11 @@ from installer.summary import record_note
 from installer.system import download_to_file, package_installed, run_command, write_text
 
 
+BEANS_HELP_LAUNCHER = """#!/bin/sh
+exec cat /usr/local/share/beans/help.txt
+"""
+
+
 def _fetch_json(url: str) -> dict:
     with urllib.request.urlopen(url) as response:
         return json.loads(response.read().decode("utf-8"))
@@ -123,14 +128,17 @@ def install_obsidian(ctx: InstallerContext) -> None:
 
 def install_desktop_assets(ctx: InstallerContext) -> None:
     if ctx.dry_run:
-        record_note(ctx, "Dry run: would install Beans desktop assets and hash-check wrapper.")
+        record_note(ctx, "Dry run: would install Beans desktop assets, help command, and hash-check wrapper.")
         return
     readme_src = ctx.assets_dir / "desktop" / "README.txt"
     readme_dst = ctx.desktop_dir / "Beans-README.txt"
     if readme_src.exists() and not ctx.dry_run:
+        readme_content = readme_src.read_text(encoding="utf-8")
         readme_dst.parent.mkdir(parents=True, exist_ok=True)
-        readme_dst.write_text(readme_src.read_text(encoding="utf-8"), encoding="utf-8")
+        readme_dst.write_text(readme_content, encoding="utf-8")
         run_command(ctx, ["chown", f"{ctx.real_user}:{ctx.real_user}", str(readme_dst)])
+        write_text(Path("/usr/local/share/beans/help.txt"), readme_content)
+        write_text(Path("/usr/local/bin/beans-help"), BEANS_HELP_LAUNCHER, mode=0o755)
 
     hash_check_target = ctx.repo_root / "installer" / "hash_check.py"
     write_text(

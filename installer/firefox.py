@@ -16,7 +16,13 @@ BOOKMARK_TITLES = {
     "bookmarks.html": None,
 }
 MANAGED_BOOKMARKS_ROOT = "PAI"
+MANAGED_BOOKMARKS_FILE = "PAI_bookmarks_2026.html"
 BOOKMARK_TOOLBAR_NAMES = {"Bookmarks Toolbar", "Bookmarks bar"}
+UBLOCK_ORIGIN_EXTENSION_ID = "uBlock0@raymondhill.net"
+UBLOCK_ORIGIN_INSTALL_URL = (
+    "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi"
+)
+BLOCKED_PERMISSION_REQUESTS = ("Camera", "Microphone", "Location")
 
 
 class _NetscapeBookmarkParser(HTMLParser):
@@ -93,6 +99,33 @@ def _bookmark_candidates(html_path: Path) -> list[tuple[str, str]]:
         label = re.sub(r"<[^>]+>", "", unescape(title)).strip() or url
         entries.append((url.strip(), label))
     return entries
+
+
+def _folder_children(
+    entries: list[dict[str, object]], folder_name: str
+) -> list[dict[str, object]] | None:
+    for entry in entries:
+        if entry.get("name") != folder_name:
+            continue
+        children = entry.get("children")
+        if isinstance(children, list):
+            return children
+    return None
+
+
+def _managed_pai_tree(html_path: Path) -> list[dict[str, object]]:
+    tree = _netscape_bookmark_tree(html_path)
+    direct_pai = _folder_children(tree, MANAGED_BOOKMARKS_ROOT)
+    if direct_pai is not None:
+        return direct_pai
+    for toolbar_name in BOOKMARK_TOOLBAR_NAMES:
+        toolbar_children = _folder_children(tree, toolbar_name)
+        if toolbar_children is None:
+            continue
+        pai_children = _folder_children(toolbar_children, MANAGED_BOOKMARKS_ROOT)
+        if pai_children is not None:
+            return pai_children
+    return []
 
 
 def _dedupe_bookmarks(entries: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -205,16 +238,28 @@ def _managed_bookmarks(ctx: InstallerContext) -> list[dict[str, object]]:
     bookmarks_dir = ctx.assets_dir / "firefox" / "bookmarks"
     managed: list[dict[str, object]] = [{"toplevel_name": MANAGED_BOOKMARKS_ROOT}]
 
-    links_tree = _netscape_bookmark_tree(bookmarks_dir / "LINKS_2024.html")
-    managed.extend(links_tree)
-
-    osint_tree = _netscape_bookmark_tree(
-        bookmarks_dir / "OSINT_Combine_bookmarks_11_12_25.html"
-    )
-    if osint_tree:
-        managed.append({"name": "OSINT Combine", "children": osint_tree})
+    managed.extend(_managed_pai_tree(bookmarks_dir / MANAGED_BOOKMARKS_FILE))
 
     return managed if len(managed) > 1 else []
+
+
+def _firefox_extension_settings() -> dict[str, dict[str, str]]:
+    return {
+        UBLOCK_ORIGIN_EXTENSION_ID: {
+            "installation_mode": "force_installed",
+            "install_url": UBLOCK_ORIGIN_INSTALL_URL,
+        }
+    }
+
+
+def _firefox_permission_settings() -> dict[str, dict[str, bool]]:
+    return {
+        permission: {
+            "BlockNewRequests": True,
+            "Locked": True,
+        }
+        for permission in BLOCKED_PERMISSION_REQUESTS
+    }
 
 
 def _write_firefox_policies(ctx: InstallerContext) -> None:
@@ -232,6 +277,21 @@ def _write_firefox_policies(ctx: InstallerContext) -> None:
         policies["ManagedBookmarks"] = managed_bookmarks
     elif "ManagedBookmarks" in policies:
         del policies["ManagedBookmarks"]
+    extension_settings = policies.get("ExtensionSettings")
+    if not isinstance(extension_settings, dict):
+        extension_settings = {}
+        policies["ExtensionSettings"] = extension_settings
+    extension_settings.update(_firefox_extension_settings())
+    permissions = policies.get("Permissions")
+    if not isinstance(permissions, dict):
+        permissions = {}
+        policies["Permissions"] = permissions
+    for permission, settings in _firefox_permission_settings().items():
+        existing = permissions.get(permission)
+        if not isinstance(existing, dict):
+            existing = {}
+            permissions[permission] = existing
+        existing.update(settings)
     write_json(policies_path, payload)
 
 
