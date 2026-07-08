@@ -1,66 +1,26 @@
-import json
-from types import SimpleNamespace
-
-from installer import customize
 from installer.customize import (
-    LEGACY_PANEL_APPLET_ENTRY,
-    _grouped_window_list_instance_ids,
-    _without_legacy_panel_applet,
+    PANEL_APPLET_ENTRY,
+    PANEL_SLOTS,
+    _enabled_with_panel_applet,
 )
 
 
-def test_legacy_panel_launcher_is_removed_from_enabled_applets() -> None:
-    enabled = (
-        "['panel1:left:0:menu@cinnamon.org:0', "
-        f"'{LEGACY_PANEL_APPLET_ENTRY}', "
-        "'panel1:left:1:grouped-window-list@cinnamon.org:2']"
-    )
-
-    assert _without_legacy_panel_applet(enabled) == (
-        "['panel1:left:0:menu@cinnamon.org:0', "
-        "'panel1:left:1:grouped-window-list@cinnamon.org:2']"
-    )
-
-
-def test_enabled_applets_without_legacy_launcher_are_unchanged() -> None:
+def test_panel_applet_is_added_once() -> None:
     enabled = "['panel1:left:0:menu@cinnamon.org:0']"
 
-    assert _without_legacy_panel_applet(enabled) is None
-
-
-def test_grouped_window_list_instance_ids_are_read_from_enabled_applets() -> None:
-    enabled = (
+    assert _enabled_with_panel_applet(enabled) == (
         "['panel1:left:0:menu@cinnamon.org:0', "
-        "'panel1:left:1:grouped-window-list@cinnamon.org:2']"
+        f"'{PANEL_APPLET_ENTRY}']"
     )
+    assert _enabled_with_panel_applet(
+        f"['panel1:left:0:menu@cinnamon.org:0', '{PANEL_APPLET_ENTRY}']"
+    ) is None
 
-    assert _grouped_window_list_instance_ids(enabled) == ["2"]
 
+def test_beans_launcher_set_does_not_duplicate_firefox() -> None:
+    candidates = [candidate for _, slot in PANEL_SLOTS for candidate in slot]
 
-def test_grouped_window_list_favorites_use_pinned_apps_setting(
-    tmp_path, monkeypatch
-) -> None:
-    context = SimpleNamespace(user_home=tmp_path)
-    monkeypatch.setattr(
-        customize,
-        "ensure_directory_for_user",
-        lambda ctx, path: path.mkdir(parents=True, exist_ok=True),
-    )
-    monkeypatch.setattr(customize, "chown_path", lambda ctx, path: None)
-
-    customize._write_grouped_window_list_favorites(
-        context, ["2"], ["firefox.desktop", "google-chrome.desktop"]
-    )
-
-    config_path = (
-        tmp_path
-        / ".cinnamon"
-        / "configs"
-        / "grouped-window-list@cinnamon.org"
-        / "2.json"
-    )
-    payload = json.loads(config_path.read_text(encoding="utf-8"))
-    assert payload["pinned-apps"]["value"] == [
-        "firefox.desktop",
-        "google-chrome.desktop",
-    ]
+    assert "firefox.desktop" not in candidates
+    assert "google-chrome.desktop" in candidates
+    assert "obsidian.desktop" in candidates
+    assert "sticky.desktop" in candidates

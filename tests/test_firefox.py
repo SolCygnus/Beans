@@ -127,6 +127,7 @@ def test_current_assets_keep_toolbar_links_separate_from_pai_hierarchy() -> None
     basic_computing = next(
         entry for entry in managed if entry.get("name") == "BASIC COMPUTE CONCEPTS"
     )
+    assert basic_computing["children"][0]["name"] == "Number Conversion"
     assert any(
         child.get("name") == "Academic"
         for child in basic_computing.get("children", [])

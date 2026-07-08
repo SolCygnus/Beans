@@ -80,8 +80,7 @@ sudo python3 main.py --refresh-assets all
 - Firefox and Chrome open with visible bookmark toolbars and imported bookmarks
 - Firefox shows uBlock Origin installed in `about:addons`
 - Firefox blocks new location, camera, and microphone permission requests
-- Wallpaper and Cinnamon grouped-taskbar favorites are applied without a duplicate Firefox launcher
-- Mint Notes starts automatically with a Beans welcome note on the desktop
+- Wallpaper and Beans panel launchers are applied beside Mint's grouped taskbar without duplicating Firefox
 - User is in `vboxsf` group (`id <user>`; change takes effect after logout/reboot)
 
 ## What Beans Installs
@@ -125,8 +124,7 @@ sudo python3 main.py --refresh-assets all
 - Beans wallpaper
 - Terminal banner in `.bashrc`
 - Mint dark mode via `Mint-Y-Dark`
-- Cinnamon grouped-taskbar favorites in fixed order: Firefox, Brave, Chrome, Tor Browser, calculator, Obsidian, KeePassXC, VS Code, VLC, and Mint Notes
-- Mint Notes autostart with a one-time Beans welcome note
+- Mint's grouped taskbar retains Firefox; Beans adds launchers for Brave, Chrome, Tor Browser, calculator, Obsidian, KeePassXC, VS Code, VLC, and Mint Notes
 
 ## Operational Notes
 

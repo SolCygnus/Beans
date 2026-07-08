@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import ast
+import json
 import os
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from installer.system import (
     ensure_directory_for_user,
     read_json,
     run_command,
-    write_json,
+    write_text,
 )
 
 try:
@@ -22,7 +22,6 @@ except ImportError:  # pragma: no cover - only relevant off Linux
 
 
 PANEL_SLOTS = [
-    ("Firefox", ["firefox.desktop"]),
     ("Brave", ["brave-browser.desktop"]),
     ("Chrome", ["google-chrome.desktop"]),
     ("Tor Browser", ["torbrowser.desktop"]),
@@ -33,8 +32,8 @@ PANEL_SLOTS = [
     ("VLC", ["vlc.desktop"]),
     ("Notes", ["sticky.desktop", "xed.desktop", "org.x.editor.desktop"]),
 ]
-LEGACY_PANEL_APPLET_ENTRY = "panel1:left:2:panel-launchers@cinnamon.org:100"
-GROUPED_WINDOW_LIST_UUID = "grouped-window-list@cinnamon.org"
+PANEL_APPLET_ID = 100
+PANEL_APPLET_ENTRY = f"panel1:left:2:panel-launchers@cinnamon.org:{PANEL_APPLET_ID}"
 
 
 def _user_env(ctx: InstallerContext) -> dict[str, str]:
@@ -105,56 +104,35 @@ def _favorite_apps() -> tuple[list[str], list[str]]:
     return launchers, missing
 
 
-def _without_legacy_panel_applet(enabled_applets: str) -> str | None:
-    if LEGACY_PANEL_APPLET_ENTRY not in enabled_applets:
+def _enabled_with_panel_applet(enabled_applets: str) -> str | None:
+    if PANEL_APPLET_ENTRY in enabled_applets:
         return None
-    return enabled_applets.replace(f"'{LEGACY_PANEL_APPLET_ENTRY}', ", "").replace(
-        f", '{LEGACY_PANEL_APPLET_ENTRY}'", ""
-    ).replace(f"'{LEGACY_PANEL_APPLET_ENTRY}'", "")
+    if not enabled_applets.startswith("[") or not enabled_applets.endswith("]"):
+        return None
+    inner = enabled_applets[1:-1].strip()
+    return f"[{inner}, '{PANEL_APPLET_ENTRY}']" if inner else f"['{PANEL_APPLET_ENTRY}']"
 
 
-def _grouped_window_list_instance_ids(enabled_applets: str) -> list[str]:
-    try:
-        entries = ast.literal_eval(enabled_applets)
-    except (SyntaxError, ValueError):
-        return []
-    if not isinstance(entries, list):
-        return []
-    instance_ids: list[str] = []
-    for entry in entries:
-        if not isinstance(entry, str) or f":{GROUPED_WINDOW_LIST_UUID}:" not in entry:
-            continue
-        instance_id = entry.rsplit(":", 1)[-1]
-        if instance_id and instance_id not in instance_ids:
-            instance_ids.append(instance_id)
-    return instance_ids
-
-
-def _write_grouped_window_list_favorites(
-    ctx: InstallerContext, instance_ids: list[str], launchers: list[str]
-) -> None:
-    config_dir = ctx.user_home / ".cinnamon" / "configs" / GROUPED_WINDOW_LIST_UUID
-    ensure_directory_for_user(ctx, config_dir)
-    for instance_id in instance_ids:
-        config_path = config_dir / f"{instance_id}.json"
-        config_payload = read_json(config_path, default={})
-        config_payload["pinned-apps"] = {
-            "type": "generic",
-            "default": ["nemo.desktop", "firefox.desktop", "org.gnome.Terminal.desktop"],
-            "value": launchers,
-        }
-        write_json(config_path, config_payload)
-        chown_path(ctx, config_path)
-
-
-def _configure_panel_favorites(ctx: InstallerContext) -> None:
+def _configure_panel_launchers(ctx: InstallerContext) -> None:
     launchers, missing = _favorite_apps()
     if not launchers:
-        record_note(ctx, "No requested Cinnamon desktop files were found for taskbar favorites.")
+        record_note(ctx, "No requested Cinnamon launcher desktop files were found for panel pinning.")
         return
     if ctx.dry_run:
-        record_note(ctx, "Dry run: would configure the Cinnamon grouped-taskbar favorites.")
+        record_note(ctx, "Dry run: would pin the Beans launcher set beside Mint's grouped taskbar.")
         return
+
+    config_dir = ctx.user_home / ".cinnamon" / "configs" / "panel-launchers@cinnamon.org"
+    ensure_directory_for_user(ctx, config_dir)
+    config_path = config_dir / f"{PANEL_APPLET_ID}.json"
+    config_payload = read_json(config_path, default={})
+    config_payload["launcherList"] = {
+        "type": "list",
+        "default": [],
+        "value": launchers,
+    }
+    write_text(config_path, json.dumps(config_payload, indent=2, sort_keys=True) + "\n")
+    chown_path(ctx, config_path)
 
     env = _user_env(ctx)
     enabled = run_command(
@@ -167,12 +145,7 @@ def _configure_panel_favorites(ctx: InstallerContext) -> None:
     )
     if enabled.returncode == 0:
         current = enabled.stdout.strip()
-        instance_ids = _grouped_window_list_instance_ids(current)
-        if instance_ids:
-            _write_grouped_window_list_favorites(ctx, instance_ids, launchers)
-        else:
-            record_note(ctx, "The Cinnamon grouped-window-list applet was not found; taskbar favorites were unchanged.")
-        updated = _without_legacy_panel_applet(current)
+        updated = _enabled_with_panel_applet(current)
         if updated is not None:
             run_command(
                 ctx,
@@ -182,8 +155,8 @@ def _configure_panel_favorites(ctx: InstallerContext) -> None:
                 check=False,
             )
     if missing:
-        record_note(ctx, f"Some requested taskbar favorites were not found and were skipped: {', '.join(missing)}.")
-    record_note(ctx, "Cinnamon grouped-taskbar favorites were configured. A logout or Cinnamon restart may be required.")
+        record_note(ctx, f"Some requested panel launchers were not found and were skipped: {', '.join(missing)}.")
+    record_note(ctx, "Beans panel launchers were configured without duplicating Mint's Firefox pin. A logout or Cinnamon restart may be required.")
 
 
 def _apply_dark_mode(ctx: InstallerContext) -> None:
@@ -204,5 +177,5 @@ def apply_desktop_customizations(ctx: InstallerContext) -> None:
     _append_banner(ctx)
     _apply_wallpaper(ctx)
     _apply_dark_mode(ctx)
-    _configure_panel_favorites(ctx)
-    record_note(ctx, "Desktop customizations applied: banner, wallpaper, dark mode, and Cinnamon taskbar favorites.")
+    _configure_panel_launchers(ctx)
+    record_note(ctx, "Desktop customizations applied: banner, wallpaper, dark mode, and Cinnamon panel launchers.")
