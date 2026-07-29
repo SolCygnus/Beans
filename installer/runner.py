@@ -140,6 +140,8 @@ def execute_component(ctx: InstallerContext, component_id: str) -> None:
         searxng.install_searxng(ctx)
     elif component_id == "sherlock":
         pipx_tools.install_sherlock(ctx)
+    elif component_id == "holehe":
+        pipx_tools.install_holehe(ctx)
     elif component_id == "shodan-cli":
         pipx_tools.install_shodan(ctx)
     elif component_id == "theharvester":

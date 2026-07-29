@@ -72,6 +72,7 @@ sudo python3 main.py --refresh-assets all
 - `systemctl list-timers --all | grep -i beans-clamav-scan` shows the ClamAV timer
 - `zbarimg --help` works
 - `sherlock --help` works
+- `holehe --help` works
 - `theHarvester --help` works
 - `shodan --help` works
 - `recon-ng -h` works
@@ -100,6 +101,7 @@ sudo python3 main.py --refresh-assets all
 - SearXNG
 - Whisper
 - Sherlock
+- Holehe
 - theHarvester
 - Shodan CLI
 - recon-ng
@@ -134,6 +136,7 @@ sudo python3 main.py --refresh-assets all
 - Beans does not auto-mount or link host shares
 - `shodan` still requires later API-key configuration
 - SearXNG is installed in `/opt/beans/searxng/venv`, listens only on `127.0.0.1:8888`, and is started manually
+- SpiderFoot is installed from its stable `v4.0` release, listens only on `127.0.0.1:5001`, and is started manually
 - Whisper prefers GPU acceleration when `nvidia-smi` is present and a compatible PyTorch CUDA wheel validates; if validation fails, Beans falls back to CPU mode automatically
 - Beans does not automatically install `nvidia-utils-*`; in most VirtualBox guests, the host laptop GPU is not exposed as a usable NVIDIA device
 
@@ -167,6 +170,34 @@ tail -n 50 ~/.local/state/beans/searxng.log
 ```
 
 The launcher binds SearXNG to localhost only; it is not exposed to the VM network.
+
+### SpiderFoot Commands
+
+Run the launcher commands as the normal desktop user, not with `sudo`.
+
+```bash
+beans-spiderfoot-start
+beans-spiderfoot-status
+beans-spiderfoot-stop
+```
+
+SpiderFoot stores its per-user runtime log at `~/.local/state/beans/spiderfoot.log`. If it does not become ready, inspect the last lines with:
+
+```bash
+tail -n 50 ~/.local/state/beans/spiderfoot.log
+```
+
+To install or repair SpiderFoot on an existing Beans VM, update the repository and run:
+
+```bash
+sudo python3 main.py --only spiderfoot
+```
+
+To install or repair Holehe:
+
+```bash
+sudo python3 main.py --only holehe
+```
 
 ## Assets
 

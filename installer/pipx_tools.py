@@ -49,6 +49,18 @@ def install_sherlock(ctx: InstallerContext) -> None:
     record_note(ctx, "Sherlock installed via pipx.")
 
 
+def install_holehe(ctx: InstallerContext) -> None:
+    known = _ensure_pipx_root(ctx)
+    if "holehe" not in known:
+        run_command(
+            ctx,
+            ["pipx", "install", "--force", "--python", _pipx_python(ctx), "holehe"],
+            env=PIPX_ENV,
+        )
+    _verify_command(ctx, "holehe")
+    record_note(ctx, "Holehe installed via pipx.")
+
+
 def install_shodan(ctx: InstallerContext) -> None:
     known = _ensure_pipx_root(ctx)
     if "shodan" not in known:

@@ -49,6 +49,7 @@ DEFAULT_COMPONENTS = [
     ComponentSpec("whisper", "Install Whisper with GPU fallback", fatal=False),
     ComponentSpec("searxng", "Install local SearXNG metasearch", fatal=False),
     ComponentSpec("sherlock", "Install Sherlock", fatal=False),
+    ComponentSpec("holehe", "Install Holehe", fatal=False),
     ComponentSpec("shodan-cli", "Install the Shodan CLI", fatal=False),
     ComponentSpec("theharvester", "Install theHarvester", fatal=False),
     ComponentSpec("recon-ng", "Install recon-ng", fatal=False),

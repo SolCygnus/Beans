@@ -25,8 +25,11 @@ Beans Commands:
 
 Research Tools:
 
-- SpiderFoot local web interface: `spiderfoot`, then open `http://127.0.0.1:5001`
+- Start SpiderFoot: `beans-spiderfoot-start` (or `spiderfoot`)
+- Check or stop SpiderFoot: `beans-spiderfoot-status` or `beans-spiderfoot-stop`
+- SpiderFoot log: `~/.local/state/beans/spiderfoot.log`
 - Search usernames with Sherlock: `sherlock USERNAME`
+- Find accounts linked to an email: `holehe EMAIL_ADDRESS`
 - Show theHarvester data-source options: `theHarvester --help`
 - Configure Shodan before first use: `shodan init API_KEY`
 - Look up an IP with Shodan: `shodan host IP_ADDRESS`
