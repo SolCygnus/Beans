@@ -11,6 +11,11 @@ SPIDERFOOT_ROOT = Path("/opt/beans/spiderfoot")
 SPIDERFOOT_APP = SPIDERFOOT_ROOT / "app"
 SPIDERFOOT_VENV = SPIDERFOOT_ROOT / "venv"
 SPIDERFOOT_RELEASE = "v4.0"
+SPIDERFOOT_REQUIREMENTS = SPIDERFOOT_ROOT / "requirements-beans.txt"
+
+
+def _requirements_content(content: str) -> str:
+    return content.replace("pyyaml>=5.4.1,<6", "pyyaml>=6,<7")
 
 
 def _start_script() -> str:
@@ -158,7 +163,8 @@ def install_spiderfoot(ctx: InstallerContext) -> None:
     run_command(ctx, [str(python_path), "-m", "pip", "install", "--upgrade", "pip", "setuptools", "wheel"])
     requirements = SPIDERFOOT_APP / "requirements.txt"
     if requirements.exists():
-        run_command(ctx, [str(python_path), "-m", "pip", "install", "-r", str(requirements)])
+        write_text(SPIDERFOOT_REQUIREMENTS, _requirements_content(requirements.read_text(encoding="utf-8")))
+        run_command(ctx, [str(python_path), "-m", "pip", "install", "-r", str(SPIDERFOOT_REQUIREMENTS)])
     run_command(ctx, [str(python_path), "-m", "pip", "check"])
     run_command(ctx, [str(python_path), str(SPIDERFOOT_APP / "sf.py"), "--version"], cwd=SPIDERFOOT_APP, user=ctx.real_user)
     write_text(Path("/usr/local/bin/spiderfoot"), _start_script(), mode=0o755)

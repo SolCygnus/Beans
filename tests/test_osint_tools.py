@@ -41,3 +41,9 @@ def test_spiderfoot_launchers_include_health_checks() -> None:
     assert "spiderfoot.log" in start_script
     assert "curl --silent --fail" in status_script
     assert "spiderfoot.log" in status_script
+
+
+def test_spiderfoot_requirements_support_python_3_12() -> None:
+    requirements = "requests>=2,<3\npyyaml>=5.4.1,<6\n"
+
+    assert spiderfoot._requirements_content(requirements) == "requests>=2,<3\npyyaml>=6,<7\n"
