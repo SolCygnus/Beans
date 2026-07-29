@@ -2,20 +2,75 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from installer import apt as apt_installer
 from installer.context import InstallerContext
 from installer.summary import record_note
-from installer.system import copy_path, run_command, write_text
+from installer.system import copy_path, package_installed, run_command, write_text
+
+
+UFW_BEFORE_RULES = Path("/etc/ufw/before.rules")
+ICMP_RULES = [
+    "-A ufw-before-output -p icmp --icmp-type echo-request -j ACCEPT",
+    "-A ufw-before-input -p icmp --icmp-type echo-reply -j ACCEPT",
+]
+BASELINE_UFW_RULES = [
+    ["allow", "in", "on", "lo"],
+    ["allow", "out", "on", "lo"],
+    ["allow", "out", "53/udp"],
+    ["allow", "out", "53/tcp"],
+    ["allow", "out", "80/tcp"],
+    ["allow", "out", "443/tcp"],
+    ["allow", "out", "443/udp"],
+    ["allow", "out", "123/udp"],
+    ["allow", "out", "67/udp"],
+    ["allow", "in", "68/udp"],
+]
+
+
+def _ensure_ufw_installed(ctx: InstallerContext) -> None:
+    if package_installed(ctx, "ufw"):
+        return
+    apt_installer.apt_update(ctx)
+    apt_installer.apt_install(ctx, ["ufw"])
+
+
+def _filter_bounds(lines: list[str]) -> tuple[int, int]:
+    try:
+        filter_start = lines.index("*filter")
+    except ValueError as exc:
+        raise RuntimeError(f"Could not find the *filter section in {UFW_BEFORE_RULES}.") from exc
+    for index in range(filter_start + 1, len(lines)):
+        if lines[index] == "COMMIT":
+            return filter_start, index
+    raise RuntimeError(f"Could not find the *filter COMMIT in {UFW_BEFORE_RULES}.")
+
+
+def _ensure_icmp_before_rules(ctx: InstallerContext) -> None:
+    lines = UFW_BEFORE_RULES.read_text(encoding="utf-8").splitlines()
+    filter_start, filter_commit = _filter_bounds(lines)
+    filter_rules = lines[filter_start:filter_commit]
+    missing_rules = [rule for rule in ICMP_RULES if rule not in filter_rules]
+    if not missing_rules:
+        return
+    lines[filter_commit:filter_commit] = missing_rules
+    UFW_BEFORE_RULES.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    ctx.logger.info("Added required IPv4 ICMP rules to %s.", UFW_BEFORE_RULES)
 
 
 def _configure_ufw(ctx: InstallerContext) -> None:
+    _ensure_ufw_installed(ctx)
+    _ensure_icmp_before_rules(ctx)
+    for rule in BASELINE_UFW_RULES:
+        run_command(ctx, ["ufw", *rule])
     run_command(ctx, ["ufw", "default", "deny", "incoming"])
     run_command(ctx, ["ufw", "default", "deny", "outgoing"])
-    run_command(ctx, ["ufw", "allow", "in", "on", "lo"])
-    run_command(ctx, ["ufw", "allow", "out", "on", "lo"])
-    for rule in ["53/tcp", "53/udp", "80/tcp", "443/tcp", "443/udp", "123/udp"]:
-        run_command(ctx, ["ufw", "allow", "out", rule], check=False)
+    run_command(ctx, ["ufw", "default", "deny", "routed"])
     run_command(ctx, ["ufw", "logging", "on"])
-    run_command(ctx, ["ufw", "--force", "enable"])
+    status = run_command(ctx, ["ufw", "status"], capture_output=True)
+    if "Status: active" in status.stdout:
+        run_command(ctx, ["ufw", "reload"])
+    else:
+        run_command(ctx, ["ufw", "--force", "enable"])
 
 
 def _install_clamav_scan(ctx: InstallerContext) -> None:

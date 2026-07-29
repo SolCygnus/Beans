@@ -116,9 +116,29 @@ sudo python3 main.py --refresh-assets all
 
 ### Security Baseline
 
-- UFW with default deny for inbound and outbound traffic
-- Explicit outbound allow rules for `53/tcp`, `53/udp`, `80/tcp`, `443/tcp`, `443/udp`, and `123/udp`
+- UFW with default deny for incoming, outgoing, and routed traffic
+- Loopback traffic allowed in both directions
+- Explicit outbound allow rules for DNS (`53/tcp`, `53/udp`), HTTP (`80/tcp`), HTTPS and QUIC (`443/tcp`, `443/udp`), NTP (`123/udp`), and DHCP (`67/udp`), with DHCP replies allowed inbound on `68/udp`
+- Narrow IPv4 ICMP rules allowing outbound echo requests and inbound echo replies
 - Weekly ClamAV scans of `/tmp`, `/var/tmp`, `/dev/shm`, `/home`, `/media`, and `/run/user`
+
+### Firewall Verification
+
+```bash
+sudo ufw status verbose
+sudo ufw status numbered
+sudo grep -nE 'ufw-before-(input|output).*icmp' /etc/ufw/before.rules
+ip route
+resolvectl status
+ping -4 -c 3 8.8.8.8
+ping -4 -c 3 google.com
+curl -I --max-time 15 http://example.com
+curl -I --max-time 15 https://example.com
+sudo systemctl restart NetworkManager
+sleep 5
+ip -brief address
+ip route
+```
 
 ### Desktop Customizations
 
